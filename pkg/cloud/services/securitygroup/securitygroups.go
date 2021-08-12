@@ -215,11 +215,10 @@ func (s *Service) describeSecurityGroupOverridesByID() (map[infrav1.SecurityGrou
 	if len(overrides) > 0 {
 		for _, role := range defaultRoles {
 			securityGroupID, ok := s.scope.SecurityGroupOverrides()[role]
-			if !ok {
-				return nil, errors.Errorf("security group overrides have been provided for some but not all roles - missing security group for role %s", role)
+			if ok {
+				securityGroupIds[role] = aws.String(securityGroupID)
+				input.GroupIds = append(input.GroupIds, aws.String(securityGroupID))
 			}
-			securityGroupIds[role] = aws.String(securityGroupID)
-			input.GroupIds = append(input.GroupIds, aws.String(securityGroupID))
 		}
 	}
 
@@ -231,6 +230,10 @@ func (s *Service) describeSecurityGroupOverridesByID() (map[infrav1.SecurityGrou
 	res := make(map[infrav1.SecurityGroupRole]*ec2.SecurityGroup, len(out.SecurityGroups))
 	for _, role := range defaultRoles {
 		for _, ec2sg := range out.SecurityGroups {
+			if securityGroupIds[role] == nil {
+				continue
+			}
+
 			if *ec2sg.GroupId == *securityGroupIds[role] {
 				s.scope.V(2).Info("found security group override", "role", role, "security group", *ec2sg.GroupName)
 
